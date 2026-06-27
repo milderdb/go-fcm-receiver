@@ -13,28 +13,31 @@ func (f *FCMClient) Register() (string, string, uint64, uint64, error) {
 		return "", f.GcmToken, f.AndroidId, f.SecurityToken, err
 	}
 
-	err := f.registerFCM()
-	if err != nil {
-		return "", f.GcmToken, f.AndroidId, f.SecurityToken, err
-	}
-
-	if f.AndroidId == 0 || f.SecurityToken == 0 {
-		err := f.checkInRequestGCM()
-		if err != nil {
-			return "", "", 0, 0, err
-		}
-	}
-
 	if f.privateKey == nil || f.authSecret == nil {
 		err := errors.New("client's private key hasn't been set. use FCMClient.LoadKeys() or FCMClient.CreateNewKeys()")
 		return "", f.GcmToken, f.AndroidId, f.SecurityToken, err
 	}
 
-	if f.GcmToken == "" || f.FcmToken == "" {
-		err := f.registerRequestGCM()
-		if err != nil {
+	// Order matters: GCM checkin + register must run BEFORE the FCM registration, because
+	// the FCM registration's endpoint embeds the GcmToken (fcm/send/<GcmToken>). Running
+	// registerFCM first (as the original did) builds an empty endpoint and yields no token.
+	if f.AndroidId == 0 || f.SecurityToken == 0 {
+		if err := f.checkInRequestGCM(); err != nil {
 			return "", "", 0, 0, err
 		}
+	}
+
+	if f.GcmToken == "" {
+		if err := f.registerRequestGCM(); err != nil {
+			return "", "", 0, 0, err
+		}
+	}
+
+	// FCM registration (web flow, applicationPubKey omitted for non-web). This token is
+	// the one to register with the app server (e.g. Ring); it routes via the GcmToken to
+	// this client's MCS connection.
+	if err := f.registerFCM(); err != nil {
+		return "", f.GcmToken, f.AndroidId, f.SecurityToken, err
 	}
 
 	return f.FcmToken, f.GcmToken, f.AndroidId, f.SecurityToken, nil

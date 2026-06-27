@@ -215,14 +215,17 @@ func (f *FCMClient) SendFCMRegisterRequest() (*FCMRegisterResponse, error) {
 	authSecret = strings.ReplaceAll(authSecret, "+", "")
 	authSecret = strings.ReplaceAll(authSecret, "/", "")
 
-	body := map[string]interface{}{
-		"web": map[string]string{
-			"applicationPubKey": f.VapidKey,
-			"auth":              authSecret,
-			"endpoint":          fmt.Sprintf("%s/%s", FcmEndpointUrl, f.GcmToken),
-			"p256dh":            publicKey,
-		},
+	web := map[string]string{
+		"auth":     authSecret,
+		"endpoint": fmt.Sprintf("%s/%s", FcmEndpointUrl, f.GcmToken),
+		"p256dh":   publicKey,
 	}
+	// Only send applicationPubKey when a real VAPID key is set. An empty value makes
+	// FCM registration fail (returns no token) — Android (non-web) clients omit it.
+	if f.VapidKey != "" {
+		web["applicationPubKey"] = f.VapidKey
+	}
+	body := map[string]interface{}{"web": web}
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
