@@ -216,15 +216,9 @@ func chromeWebAppID() string {
 
 // SendFCMRegisterRequest FCM Registration Request
 func (f *FCMClient) SendFCMRegisterRequest() (*FCMRegisterResponse, error) {
-	publicKey := base64.URLEncoding.EncodeToString(PubBytes(f.publicKey))
-	publicKey = strings.ReplaceAll(publicKey, "=", "")
-	publicKey = strings.ReplaceAll(publicKey, "+", "")
-	publicKey = strings.ReplaceAll(publicKey, "/", "")
+	publicKey := base64.RawURLEncoding.EncodeToString(PubBytes(f.publicKey))
 
 	authSecret := base64.RawURLEncoding.EncodeToString(f.authSecret)
-	authSecret = strings.ReplaceAll(authSecret, "=", "")
-	authSecret = strings.ReplaceAll(authSecret, "+", "")
-	authSecret = strings.ReplaceAll(authSecret, "/", "")
 
 	web := map[string]string{
 		"auth":     authSecret,
