@@ -2,6 +2,7 @@ package go_fcm_receiver
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -74,7 +75,7 @@ func (f *FCMClient) SendGCMRegisterRequest() (string, error) {
 	values := url.Values{}
 
 	if f.AndroidApp == nil || f.InstallationAuthToken == nil {
-		values.Add("X-subtype", f.AppId)
+		values.Add("X-subtype", chromeWebAppID())
 		values.Add("app", "org.chromium.linux")
 		values.Add("device", strconv.FormatUint(f.AndroidId, 10))
 		values.Add("sender", base64.RawURLEncoding.EncodeToString(FcmServerKey))
@@ -201,6 +202,16 @@ func (f *FCMClient) SendFCMInstallRequest() (*FCMInstallationResponse, error) {
 	}
 
 	return &response, nil
+}
+
+func chromeWebAppID() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "wp:receiver.push.com#00000000-0000-4000-8000-000000000000"
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("wp:receiver.push.com#%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
 // SendFCMRegisterRequest FCM Registration Request
