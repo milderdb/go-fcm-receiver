@@ -9,9 +9,21 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 )
+
+// fcmDebug logs MCS-layer events to stderr when FCM_DEBUG is set. The app captures the
+// library's stderr into its log, so this surfaces login/route problems that are otherwise
+// invisible (e.g. a rejected MCS login on a socket that just stays open and silent).
+var fcmDebug = os.Getenv("FCM_DEBUG") != ""
+
+func fcmLogf(format string, a ...interface{}) {
+	if fcmDebug {
+		fmt.Fprintf(os.Stderr, "fcm: "+format+"\n", a...)
+	}
+}
 
 // FCMClient structure
 type FCMClient struct {
@@ -154,6 +166,10 @@ func (f *FCMClient) startLoginHandshake(loginRequest []byte) error {
 }
 
 func (f *FCMClient) onMessage(messageTag int, messageObject interface{}) error {
+	fcmLogf("recv tag=%d", messageTag)
+	if messageTag == KLoginResponseTag {
+		fcmLogf("login response: %+v", messageObject)
+	}
 	if messageTag == KHeartbeatPingTag {
 		err := f.socket.SendHeartbeatPing()
 		if err != nil {
@@ -179,6 +195,7 @@ func (f *FCMClient) onMessage(messageTag int, messageObject interface{}) error {
 }
 
 func (f *FCMClient) onDataMessage(message *DataMessageStanza) error {
+	fcmLogf("data message from=%q persistentId=%q", message.GetFrom(), message.GetPersistentId())
 	if StringsSliceContains(f.PersistentIds, message.GetPersistentId()) {
 		return nil
 	}
@@ -221,8 +238,10 @@ func (f *FCMClient) onDataMessage(message *DataMessageStanza) error {
 		rawData := message.RawData
 		decryptedMessage, err := DecryptMessage(cryptoKey, encryption, rawData, f.authSecret, f.privateKey)
 		if err != nil {
+			fcmLogf("decrypt failed: %v", err)
 			return err
 		}
+		fcmLogf("decrypted %d bytes", len(decryptedMessage))
 		go f.OnDataMessage(decryptedMessage)
 	} else {
 		go f.OnRawMessage(message)
