@@ -31,9 +31,11 @@ type FCMSocketHandler struct {
 
 func (f *FCMSocketHandler) StartSocketHandler() error {
 	f.socketContext, f.socketContextCancel = context.WithCancel(context.Background())
+	// errChan must exist before the goroutines run: close() drops the error via
+	// select/default when errChan is nil, which would leave this receive blocked forever.
+	f.errChan = make(chan error)
 	go f.readData()
 	go f.sendHeartbeatPings()
-	f.errChan = make(chan error)
 	return <-f.errChan
 }
 
